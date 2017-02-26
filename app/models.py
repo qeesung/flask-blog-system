@@ -11,6 +11,7 @@ class User(UserMixin, db.Model):
     username = db.Column(db.String(64), unique=True, index=True)
     password_hash = db.Column(db.String(128))
     confirmed = db.Column(db.Boolean, default=False)
+    role_id = db.Column(db.Integer, db.ForeignKey('roles.id'))
 
     @property
     def password(self):
@@ -31,10 +32,40 @@ class User(UserMixin, db.Model):
 class Role(db.Model):
     __tablename__ = 'roles'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String('64'), unique=True)
+    name = db.Column(db.String(64), unique=True)
     default = db.Column(db.Boolean, default=False, index=True)
     permissions = db.Column(db.Integer)
     users = db.relationship('User', backref='role', lazy='dynamic')
+
+    @staticmethod
+    def insert_roles():
+        roles = {
+            'User': (
+                Permission.FOLLOW |
+                Permission.COMMENT |
+                Permission.WRITE_ARTICLE,
+                True
+            ),
+            'Moderator': (
+                Permission.FOLLOW |
+                Permission.COMMENT |
+                Permission.WRITE_ARTICLE |
+                Permission.MODERATE_COMMENTS,
+                False
+            ),
+            'Administrator': (
+                0xff,
+                False
+            )
+        }
+        for r in roles:
+            role = Role.query.filter_by(name=r).first()
+            if role is None:
+                role = Role(name=r)
+            role.permissions = roles[r][0]
+            role.default = roles[r][1]
+            db.session.add(role)
+        db.session.commit()
 
 
 class Permission:
